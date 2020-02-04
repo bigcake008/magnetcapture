@@ -1,42 +1,47 @@
 from urllib import request
 import re
-import io
+
+# URL OPTION
+url_option = {'bthub': 'https://bthub.xyz/main-search-kw-%s-%d.html',
+              'sobt5': 'http://sobt5.in/q/%s.html?sort=rel&page=%d'
+              }
+# REGEX SET
+regex_set = {'bthub': {'title': r'title="(.+)" href', 'size': r'-pill">(.+)</b>',
+                       'magnet': r'hash/(\w+).html', 'next_page': r'下一页</a>'},
+             'sobt5': {'title': r'target="_blank">(.*)</a>', 'size': r'yellow-pill">(.*B)</b>',
+                       'magnet': r'torrent/(\w+).html', 'next_page': r'class="nextpage"'}
+             }
 
 
-def bt_hub_req(kw, page):  # make up a request
-    req = request.Request('https://bthub.xyz/main-search-kw-%s-%d.html' % (kw, page))
-    print('processing: https://bthub.xyz/main-search-kw-%s-%d.html' % (kw, page))
+def make_req(kw, page, url='bthub'):  # make up a request
+    req = request.Request(url_option[url] % (kw, page))
+    print(url_option[url] % (kw, page))
     req.add_header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8')
     req.add_header('Accept-Encoding', 'gzip')
     req.add_header('Accept-Language', 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2')
     req.add_header('Connection', 'keep-alive')
-    req.add_header('Host', 'bthub.xyz')
+    req.add_header('Host', re.search(r'//(\w+.\w+)/', url_option[url])[1])
     req.add_header('Upgrade-Insecure-Requests', '1')
     req.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 '
                                  'Firefox/72.0')
     return req
 
 
-def bt_hub_cap():  # due with the captured html
+def process_data(data, web='bthub'):  # data processing
+    i = 0
     result = []
     tem_dic = {}
-    with io.open('captured_html', 'r') as f:
-        for line in f.readlines():
-            if re.search(r'<h3>', line):  # search for title & hash of the magnet
-                try:
-                    match = re.search(r'title="(.*)" href="/hash/(\w+).html"', line, re.I)
-                    tem_dic['title'] = match[1]
-                    tem_dic['magnet'] = match[2]
-                except BaseException as e:
-                    print('error:', e)
-            if re.search(r'-pill', line):  # search for size of magnet
-                match = re.search(r'<.*>(.+)</b>', line)
-                tem_dic['size'] = match[1]
-                print(tem_dic['title'])
-                result.append(tem_dic)
-                tem_dic = {}  # clean up the temporary dictionary after grouping in the result array
-            if re.search(r'下一页</a>', line):  # looking for the next page
-                next_page = True
-            if re.search(r'<span>下一页', line):
-                next_page = False
+    next_page = False
+    title = re.findall(regex_set[web]['title'], data)
+    size = re.findall(regex_set[web]['size'], data)
+    magnet = re.findall(regex_set[web]['magnet'], data)
+    while i < len(title):
+        tem_dic['title'] = re.sub(r'</?em>', '', title[i])
+        tem_dic['size'] = size[i]
+        tem_dic['magnet'] = magnet[i]
+        result.append(tem_dic)
+        tem_dic = {}
+        i += 1
+    if re.search(regex_set[web]['next_page'], data):
+        next_page = True
     return [result, next_page]

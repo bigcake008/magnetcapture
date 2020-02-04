@@ -3,7 +3,7 @@ import io
 import re
 import gzip
 import ssl
-from req import bt_hub_req, bt_hub_cap
+from req import make_req, process_data
 from time import sleep
 from random import uniform
 
@@ -25,13 +25,11 @@ class Actress:
             sleep(uniform(1.5, 2.5))  # take a break for the next connecting
 
     def process_url(self, kw, ary):
-        req = bt_hub_req(kw, self.page)
+        req = make_req(kw, self.page)
         try:
             respond = request.urlopen(req, timeout=5, context=context)
             data = gzip.decompress(respond.read()).decode('utf-8')
-            with io.open('captured_html', 'w') as f:
-                f.write(data)
-            capture = bt_hub_cap(kw)
+            capture = process_data(data)
             for item in capture[0]:
                 ary.append(item)
             if capture[1]:  # if there are pages, run them through
@@ -46,11 +44,11 @@ class Actress:
 
 with io.open('input', 'r') as file:
     for line in file.readlines():
-        if re.match(r'[\S][\W]', line, re.A):
+        if re.match(r'[\S][\W]', line, re.A):  # match the name of actress
             actress = Actress(line)
             result.append(actress)
             continue
-        if re.match(r'\w', line, re.A):
+        if re.match(r'\w', line, re.A):  # match the dvd_id
             group = re.search(r'^([0-9a-zA-Z]+[a-zA-Z])-?(\d+)', line)
             reform = '%s-%s' % (group[1], group[2])
             actress.dvd_id.append(reform)
